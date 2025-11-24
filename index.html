@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyoPS心肌病理分割</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- 使用稳定版本的ONNX Runtime，避免WASM问题 -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.0/dist/ort.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MyoPS心肌病理分割</h1>
+            <p class="description">在线心肌病理分割工具</p>
+        </header>
+        
+        <section class="upload-section">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <p>请上传MyoPS数据集的三个序列文件</p>
+                <p class="file-types">支持格式: .nii（请使用未压缩文件）</p>
+                
+                <div class="sequence-upload">
+                    <div class="upload-item">
+                        <label for="c0Upload">C0序列</label>
+                        <input type="file" id="c0Upload" class="file-input" accept=".nii">
+                        <span class="file-status" id="c0Status">未上传</span>
+                    </div>
+                    
+                    <div class="upload-item">
+                        <label for="deUpload">DE序列</label>
+                        <input type="file" id="deUpload" class="file-input" accept=".nii">
+                        <span class="file-status" id="deStatus">未上传</span>
+                    </div>
+                    
+                    <div class="upload-item">
+                        <label for="t2Upload">T2序列</label>
+                        <input type="file" id="t2Upload" class="file-input" accept=".nii">
+                        <span class="file-status" id="t2Status">未上传</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="file-info" id="fileInfo" style="display: none;">
+                <h3>文件信息</h3>
+                <div id="fileDetails"></div>
+            </div>
+            
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar">
+                    <div class="progress" id="progress"></div>
+                </div>
+                <p class="status" id="status">准备就绪</p>
+            </div>
+            
+            <div class="segmentation-choice" id="segmentationChoice">
+                <button class="choice-btn primary" id="fineSegmentBtn">🔬 继续精细分割</button>
+                <button class="choice-btn secondary" id="skipFineBtn">⏭️ 跳过（使用粗分割）</button>
+            </div>
+            
+            <div class="controls">
+                <button class="btn primary" id="processBtn" disabled>开始粗分割</button>
+                
+                <div class="control-group">
+                    <label for="opacitySlider">分割透明度:</label>
+                    <input type="range" id="opacitySlider" class="slider" min="0" max="100" value="70">
+                    <span id="opacityValue">70%</span>
+                </div>
+
+                <!-- 新增：深度拉伸控制 -->
+                <div class="control-group">
+                    <label for="depthStretchSlider">深度拉伸:</label>
+                    <input type="range" id="depthStretchSlider" class="slider" min="0.5" max="5" step="0.1" value="2.0">
+                    <span id="depthStretchValue">2.0x</span>
+                </div>
+                
+                <button class="btn secondary" id="resetBtn">重置</button>
+                <button class="btn secondary" id="downloadBtn" disabled>下载结果</button>
+            </div>
+        </section>
+        
+        <section class="visualization-section">
+            <div class="view-container">
+                <div class="view-header">
+                    <span class="view-label">轴向视图 (Axial)</span>
+                    <div class="slice-controls">
+                        <button class="btn small" id="axialPrev">◀</button>
+                        <span id="axialSlice">0/0</span>
+                        <button class="btn small" id="axialNext">▶</button>
+                    </div>
+                </div>
+                <div class="canvas-container">
+                    <canvas id="axialCanvas"></canvas>
+                </div>
+            </div>
+            
+            <div class="view-container">
+                <div class="view-header">
+                    <span class="view-label">冠状视图 (Coronal)</span>
+                    <div class="slice-controls">
+                        <button class="btn small" id="coronalPrev">◀</button>
+                        <span id="coronalSlice">0/0</span>
+                        <button class="btn small" id="coronalNext">▶</button>
+                    </div>
+                </div>
+                <div class="canvas-container">
+                    <canvas id="coronalCanvas"></canvas>
+                </div>
+            </div>
+            
+            <div class="view-container">
+                <div class="view-header">
+                    <span class="view-label">矢状视图 (Sagittal)</span>
+                    <div class="slice-controls">
+                        <button class="btn small" id="sagittalPrev">◀</button>
+                        <span id="sagittalSlice">0/0</span>
+                        <button class="btn small" id="sagittalNext">▶</button>
+                    </div>
+                </div>
+                <div class="canvas-container">
+                    <canvas id="sagittalCanvas"></canvas>
+                </div>
+            </div>
+            
+            <div class="view-container">
+                <div class="view-header">
+                    <span class="view-label">3D 分割可视化</span>
+                    <div class="view-controls">
+                        <button class="btn small" id="reset3D">重置视图</button>
+                    </div>
+                </div>
+                <div class="canvas-container">
+                    <canvas id="threeDCanvas"></canvas>
+                    <div class="control-hint">
+                        拖拽旋转 · 滚轮缩放 · 双击重置
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section class="keyboard-hint">
+            <strong>快捷键:</strong> ↑↓ 切换轴状切片 | ←→ 切换矢状切片 | 鼠标滚轮切换当前视图切片
+        </section>
+        
+        <section class="legend-section">
+            <h3>分割类别图例</h3>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ff0000;"></div>
+                    <span>LV 血池</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #00ff00;"></div>
+                    <span>RV 血池</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #0000ff;"></div>
+                    <span>LV 正常心肌</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ffff00;"></div>
+                    <span>LV 心肌水肿</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ff00ff;"></div>
+                    <span>LV 心肌瘢痕</span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- 应用脚本 -->
+    <script src="js/nifti-parser.js"></script>
+    <script src="js/file-upload-manager.js"></script>
+    <script src="js/model-runner.js"></script>
+    <script src="js/result-downloader.js"></script>
+    <script src="js/fine-segmentation.js"></script> <!-- 新增精细分割脚本 -->
+    <script src="js/multiplanar-visualization.js"></script>
+    <script src="js/3d-visualization.js"></script>
+    <script src="js/segmentation-pipeline.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
