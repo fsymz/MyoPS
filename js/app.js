@@ -700,4 +700,6 @@ document.addEventListener('DOMContentLoaded', () => {
         errorDiv.innerHTML = `<strong>应用初始化失败</strong><br>${error.message}`;
         document.body.appendChild(errorDiv);
     }
+    
 });
+
