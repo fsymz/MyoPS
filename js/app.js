@@ -17,7 +17,7 @@ class MyoPSApp {
     }
 
     initialize() {
-        console.log('🔧 初始化应用...');
+        console.log('🔧 初始化MyoPS应用...');
         
         // 预检查 ONNX Runtime
         if (typeof ort === 'undefined') {
@@ -660,7 +660,7 @@ class MyoPSApp {
             if (segmentationChoice) segmentationChoice.classList.remove('visible');
             if (fileInfo) fileInfo.style.display = 'none';
             
-            this.updateStatus('🔄 准备就绪，请上传序列文件');
+            this.updateStatus('🔄 准备就绪，请上传MyoPS序列文件');
             this.showProgress(false);
             
             // 清除结果数据
@@ -687,19 +687,19 @@ class MyoPSApp {
 
 // 应用初始化
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 应用正在初始化...');
+    console.log('🚀 MyoPS应用正在初始化...');
     try {
         window.app = new MyoPSApp();
-        console.log('✅ 应用初始化成功');
+        console.log('✅ MyoPS应用初始化成功');
         
     } catch (error) {
-        console.error('❌ 应用初始化失败:', error);
+        console.error('❌ MyoPS应用初始化失败:', error);
         
         const errorDiv = document.createElement('div');
         errorDiv.className = 'error-toast';
         errorDiv.innerHTML = `<strong>应用初始化失败</strong><br>${error.message}`;
         document.body.appendChild(errorDiv);
     }
-    
 });
+
 
